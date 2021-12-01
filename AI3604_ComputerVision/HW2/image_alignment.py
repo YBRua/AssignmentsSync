@@ -26,7 +26,7 @@ def detect_blobs(image: np.ndarray):
     sigma_0 = 5
     sigmas = []
     s = 1.25  # scaling factor
-    local_maximums = []
+    NLoGs = []
     MAX_K = 8
     for k in range(MAX_K):
         sigmas.append(sigma_0 * (s ** k))
@@ -35,15 +35,14 @@ def detect_blobs(image: np.ndarray):
         norm_factor = sigma**2
         filtered = scipy.ndimage.gaussian_filter(image, sigma)
         filtered = np.abs(scipy.ndimage.laplace(filtered))
-  
+
         normalized = norm_factor * filtered
-        local_maximum = scipy.ndimage.maximum_filter(
-            normalized,
-            size=int(sigma))
-        local_maximums.append(local_maximum)
+        NLoGs.append(normalized)
 
         # plt.imshow(local_maximum)
         # plt.show()
+
+    local_maximums = scipy.ndimage.maximum_filter(NLoGs, size=(3, 3, 3))
 
     blobs = np.max(local_maximums, axis=0)
     sizes = np.argmax(local_maximums, axis=0)
@@ -53,8 +52,8 @@ def detect_blobs(image: np.ndarray):
     attr_list = archotech.AttributeCounter(labeled_blobs).get_attr_list()
 
     # For debugging and visualization purposes
-    # annot_blobs = archotech.annotate_attributes(image, attr_list)
-    # plt.imshow(annot_blobs)
+    annot_blobs = archotech.annotate_attributes(image, attr_list)
+    plt.imshow(annot_blobs)
     corners: List[Tuple] = []
     scales: List = []
     orientations: List = []
@@ -72,7 +71,20 @@ def detect_blobs(image: np.ndarray):
     return corners, scales, orientations
 
 
-def compute_descriptors(image, corners, scales, orientations):
+def _check_window_validity(
+        x: int,
+        y: int,
+        scale: float,
+        shape: Tuple) -> bool:
+    y_max, x_max = 8, 8
+    if x + scale + 1 >= x_max or x - scale < 0:
+        return False
+    if y + scale + 1 >= y_max or y - scale < 0:
+        return False
+    return True
+
+
+def compute_descriptors(image: np.ndarray, corners, scales, orientations):
     """Compute descriptors for corners at specified scales.
 
     Args:
@@ -92,7 +104,58 @@ def compute_descriptors(image, corners, scales, orientations):
             '`corners`, `scales` and `orientations`'
             + 'must all have the same length.')
 
-    raise NotImplementedError
+    descriptors: List[np.ndarray] = []
+    for (x, y), scale, ori in zip(corners, scales, orientations):
+        x, y = int(x), int(y)
+        scale = int(scale)
+
+        if not _check_window_validity(x, y, scale, image.shape):
+            continue
+
+        local: np.ndarray = image[y-8: y+8+1, x-8: x+8+1]
+        dx, dy = np.gradient(local)
+
+        grad_mag = np.sqrt(np.square(x) + np.square(y))
+        grad_ori = np.arctan2(dx, dy)
+
+        # normalize gradient orientation
+        grad_ori = grad_ori - ori
+
+        # add gaussian weight to magnitude
+        gaussian = cv2.getGaussianKernel(
+            17, sigma=1.5*scale, ktype=cv2.CV_64F)
+        gaussian = np.matmul(gaussian, gaussian.T)
+        grad_mag = np.multiply(grad_mag, gaussian)
+
+        # compute histogram
+        grad_ori = grad_ori[:16, :16]
+        grad_mag = grad_mag[:16, :16]
+        BSZ = 4  # block size
+        ORIS = np.linspace(0, 2*np.pi, 8, endpoint=False)
+        hs = []
+        for xb in range(4):
+            for yb in range(4):
+                h = [0] * 8  # histogram
+                cob = grad_ori[
+                    xb*BSZ: (xb+1)*BSZ,
+                    yb*BSZ: (yb+1)*BSZ]  # current (4,4) orientation block
+                cmb = grad_mag[
+                    xb*BSZ: (xb+1)*BSZ,
+                    yb*BSZ: (yb+1)*BSZ]  # current (4,4) orientation block
+                for o, m in zip(cob.flatten(), cmb.flatten()):
+                    while o < 0:
+                        o += 2 * np.pi
+                    relative_o = (o / (np.pi / 4))
+                    lbin_idx = int(relative_o)
+                    bli = relative_o - lbin_idx  # interpolation factor
+                    bli /= (np.pi / 4)
+                    h[lbin_idx % 8] += (1 - bli) * m
+                    h[(lbin_idx + 1) % 8] += bli * m
+                hs.append(h)
+        hs: np.ndarray = np.array(hs).reshape(-1)
+        descriptors.append(hs)
+
+    return descriptors
 
 
 def match_descriptors(descriptors1, descriptors2):
@@ -107,7 +170,12 @@ def match_descriptors(descriptors1, descriptors2):
         indices. Each tuple contains two integer indices. For example, tuple
         (0, 42) indicates that corners1[0] is matched to corners2[42].
     """
-    raise NotImplementedError
+    dist_mat = np.zeros((len(descriptors1), len(descriptors2)))
+    for i, d1 in enumerate(descriptors1):
+        for j, d2 in enumerate(descriptors2):
+            dist_mat[i, j] = np.linalg.norm((d1 - d2), ord=2)
+
+    print(dist_mat.shape)
 
 
 def draw_matches(image1, image2, corners1, corners2, matches,
@@ -176,7 +244,11 @@ def main():
     gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY) / 255.0
 
     # TODO
-    detect_blobs(gray1)
+    c1, s1, ori1 = detect_blobs(gray1)
+    c2, s2, ori2 = detect_blobs(gray2)
+    d1 = compute_descriptors(gray1, c1, s1, ori1)
+    d2 = compute_descriptors(gray2, c2, s2, ori2)
+    match_descriptors(d1, d2)
 
 
 if __name__ == '__main__':
