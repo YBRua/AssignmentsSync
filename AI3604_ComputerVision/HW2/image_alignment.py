@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 import cv2
+import archotech
 import numpy as np
 import scipy.ndimage
-from scipy.ndimage.filters import maximum_filter
-from typing import Tuple, List
+from typing import List, Tuple
+import matplotlib.pyplot as plt
 
 
 def detect_blobs(image: np.ndarray):
@@ -21,19 +22,54 @@ def detect_blobs(image: np.ndarray):
     - orientations (list of floats): A list of floats representing the dominant
         orientation of the blobs.
     """
-    sigma_0 = 3
-    s = 2  # scaling factor
-    gausian_images: List[np.ndarray] = []
-    dogs: List[np.ndarray] = []  # delta of gaussians, not dogs
-    MAX_K = 4
+    BLOB_THRESHOLD = 0.225
+    sigma_0 = 5
+    sigmas = []
+    s = 1.25  # scaling factor
+    local_maximums = []
+    MAX_K = 8
     for k in range(MAX_K):
-        sigma = sigma_0 * s ** k
+        sigmas.append(sigma_0 * (s ** k))
+    for k in range(MAX_K):
+        sigma = sigmas[k]
+        norm_factor = sigma**2
         filtered = scipy.ndimage.gaussian_filter(image, sigma)
-        gausian_images.append(filtered)
+        filtered = np.abs(scipy.ndimage.laplace(filtered))
+  
+        normalized = norm_factor * filtered
+        local_maximum = scipy.ndimage.maximum_filter(
+            normalized,
+            size=int(sigma))
+        local_maximums.append(local_maximum)
 
-    for i in range(1, len(gausian_images)):
-        delta_of_gaussian = gausian_images[i] - gausian_images[i-1]
-        dogs.append(delta_of_gaussian)
+        # plt.imshow(local_maximum)
+        # plt.show()
+
+    blobs = np.max(local_maximums, axis=0)
+    sizes = np.argmax(local_maximums, axis=0)
+    blob_bin: np.ndarray = np.where(blobs >= BLOB_THRESHOLD, 255, 0)
+
+    labeled_blobs = archotech.ImageDivider(blob_bin).object_segmentation()
+    attr_list = archotech.AttributeCounter(labeled_blobs).get_attr_list()
+
+    # For debugging and visualization purposes
+    # annot_blobs = archotech.annotate_attributes(image, attr_list)
+    # plt.imshow(annot_blobs)
+    corners: List[Tuple] = []
+    scales: List = []
+    orientations: List = []
+
+    for attr in attr_list:
+        x, y = attr['position']['x'], attr['position']['y']
+        corners.append((x, y))
+        scales.append(sigmas[sizes[int(y), int(x)]])
+        orientations.append(attr['orientation'])
+
+    # print(corners)
+    # print(scales)
+    # print(orientations)
+
+    return corners, scales, orientations
 
 
 def compute_descriptors(image, corners, scales, orientations):
@@ -140,6 +176,7 @@ def main():
     gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY) / 255.0
 
     # TODO
+    detect_blobs(gray1)
 
 
 if __name__ == '__main__':
