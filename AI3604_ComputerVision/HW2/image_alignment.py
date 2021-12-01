@@ -39,10 +39,7 @@ def detect_blobs(image):
 
         # plt.imshow(local_maximum)
         # plt.show()
-    DoGs = []
-    for i in range(1, len(NLoGs)):
-        # DoGs[i] *= (sigmas[i]**2)
-        DoGs.append(NLoGs[i] - NLoGs[i-1])
+    DoGs = np.diff(NLoGs, n=1, axis=0)
 
     local_maximums = scipy.ndimage.maximum_filter(DoGs, size=(3, 3, 3))
 
