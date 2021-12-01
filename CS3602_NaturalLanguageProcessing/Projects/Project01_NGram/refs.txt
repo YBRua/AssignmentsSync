@@ -1,0 +1,4 @@
+https://en.wikipedia.org/wiki/Good%E2%80%93Turing_frequency_estimation
+https://github.com/Werkov/Completion
+http://www.speech.sri.com/projects/srilm/manpages/ngram-discount.7.html
+https://www.vitaarca.net/post/tech/dscapstone_report_2/

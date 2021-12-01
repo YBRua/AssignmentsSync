@@ -1,0 +1,19 @@
+COCA NLTK
+Train perplexity: 30.3748
+Dev perplexity: 71.1318
+Test perplexity: 66.5152
+
+COCA NAIVE
+Train perplexity: 30.3586
+Dev perplexity: 71.1117
+Test perplexity: 66.5062
+
+NLTK NLTK
+Train perplexity: 35.6947
+Dev perplexity: 109.2663
+Test perplexity: 99.5583
+
+NLTK NAIVE
+Train perplexity: 35.6704
+Dev perplexity: 109.2637
+Test perplexity: 99.5576

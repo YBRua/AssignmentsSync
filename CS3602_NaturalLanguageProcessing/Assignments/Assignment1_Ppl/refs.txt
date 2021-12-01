@@ -1,0 +1,2 @@
+https://www1.icsi.berkeley.edu/Speech/faq/grammarfmts.html
+http://www.speech.sri.com/projects/srilm/manpages/ngram-format.5.html
