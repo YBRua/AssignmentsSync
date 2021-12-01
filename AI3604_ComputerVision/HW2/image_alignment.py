@@ -206,24 +206,24 @@ def draw_matches(image1, image2, corners1, corners2, matches,
         x1, y1 = list(map(int, corners1[c1idx]))
         x2, y2 = list(map(int, corners2[c2idx]))
         x2 += offset
-        match_image = cv2.circle(
-            match_image,
-            (x1, y1),
-            radius=8,
-            color=(0, 255, 0),
-            thickness=-1)
-        match_image = cv2.circle(
-            match_image,
-            (x2, y2),
-            radius=8,
-            color=(0, 255, 0),
-            thickness=-1)
         match_image = cv2.line(
             match_image,
             (x1, y1),
             (x2, y2),
             color=(255, 0, 0),
             thickness=3)
+        match_image = cv2.circle(
+            match_image,
+            (x1, y1),
+            radius=8,
+            color=(0, 255, 0),
+            thickness=-1)
+        match_image = cv2.circle(
+            match_image,
+            (x2, y2),
+            radius=8,
+            color=(0, 255, 0),
+            thickness=-1)
 
     return match_image
 
