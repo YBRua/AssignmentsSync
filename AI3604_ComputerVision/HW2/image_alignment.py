@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
 import cv2
 import archotech
-import legacy_lib
 import numpy as np
 import scipy.ndimage
 from typing import List, Tuple
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 
 BLOB_THRES = 0.25
-RATIO_THRES = 0.6
-DIST_THRES = 5
+RATIO_THRES = 0.7
+DIST_THRES = 12
 
 
-def detect_blobs(image: np.ndarray):
+def detect_blobs(image):
     """Laplacian blob detector.
-
     Args:
     - image (2D float64 array): A grayscale image.
-
     Returns:
     - corners (list of 2-tuples): A list of 2-tuples representing the locations
         of detected blobs. Each tuple contains the (x, y) coordinates of a
@@ -131,6 +128,7 @@ def compute_descriptors(image: np.ndarray, corners, scales, orientations):
         scale = int(scale)
 
         if not _check_window_validity(x, y, image.shape):
+            descriptors.append(None)
             continue
 
         local: np.ndarray = image[y-8: y+8+1, x-8: x+8+1]
@@ -197,12 +195,15 @@ def match_descriptors(descriptors1, descriptors2):
         indices. Each tuple contains two integer indices. For example, tuple
         (0, 42) indicates that corners1[0] is matched to corners2[42].
     """
-
+    LARGE_NUMBER = 1e8
     matches: List[Tuple] = []
     dist_mat = np.zeros((len(descriptors1), len(descriptors2)))
     for i, d1 in enumerate(descriptors1):
         for j, d2 in enumerate(descriptors2):
-            dist_mat[i, j] = np.linalg.norm((d1 - d2), ord=2)
+            if d1 is None or d2 is None:
+                dist_mat[i, j] = LARGE_NUMBER
+            else:
+                dist_mat[i, j] = np.linalg.norm((d1 - d2), ord=2)
         candidates = np.argsort(dist_mat[i, :])
         best, second = candidates[:2]
         if dist_mat[i, best] / dist_mat[i, second] <= RATIO_THRES:
