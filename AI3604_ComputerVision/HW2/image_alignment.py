@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 import cv2
 import archotech
+import legacy_lib
 import numpy as np
 import scipy.ndimage
 from typing import List, Tuple
 import matplotlib.pyplot as plt
+
+
+BLOB_THRES = 0.25
+RATIO_THRES = 0.6
+DIST_THRES = 5
 
 
 def detect_blobs(image: np.ndarray):
@@ -22,38 +28,40 @@ def detect_blobs(image: np.ndarray):
     - orientations (list of floats): A list of floats representing the dominant
         orientation of the blobs.
     """
-    BLOB_THRESHOLD = 0.20
     sigma_0 = 5
     sigmas = []
-    s = 1.25  # scaling factor
+    s = 1.5  # scaling factor
     NLoGs = []
-    MAX_K = 8
+    MAX_K = 6
     for k in range(MAX_K):
         sigmas.append(sigma_0 * (s ** k))
     for k in range(MAX_K):
         sigma = sigmas[k]
-        norm_factor = sigma**2
         filtered = scipy.ndimage.gaussian_filter(image, sigma)
-        filtered = np.abs(scipy.ndimage.laplace(filtered))
-
-        normalized = norm_factor * filtered
-        NLoGs.append(normalized)
+        NLoGs.append(filtered)
 
         # plt.imshow(local_maximum)
         # plt.show()
+    DoGs = []
+    for i in range(1, len(NLoGs)):
+        # DoGs[i] *= (sigmas[i]**2)
+        DoGs.append(NLoGs[i] - NLoGs[i-1])
 
-    local_maximums = scipy.ndimage.maximum_filter(NLoGs, size=(3, 3, 3))
+    local_maximums = scipy.ndimage.maximum_filter(DoGs, size=(3, 7, 7))
 
     blobs = np.max(local_maximums, axis=0)
+    thres = np.quantile(blobs, 0.9)
     sizes = np.argmax(local_maximums, axis=0)
-    blob_bin: np.ndarray = np.where(blobs >= BLOB_THRESHOLD, 255, 0)
+    blob_bin: np.ndarray = np.where(blobs >= thres, 255, 0)
 
     labeled_blobs = archotech.ImageDivider(blob_bin).object_segmentation()
     attr_list = archotech.AttributeCounter(labeled_blobs).get_attr_list()
 
     # For debugging and visualization purposes
     # annot_blobs = archotech.annotate_attributes(image, attr_list)
-    # plt.imshow(annot_blobs)
+    # plt.imshow(blobs)
+    # plt.show()
+
     corners: List[Tuple] = []
     scales: List = []
     orientations: List = []
@@ -189,6 +197,7 @@ def match_descriptors(descriptors1, descriptors2):
         indices. Each tuple contains two integer indices. For example, tuple
         (0, 42) indicates that corners1[0] is matched to corners2[42].
     """
+
     matches: List[Tuple] = []
     dist_mat = np.zeros((len(descriptors1), len(descriptors2)))
     for i, d1 in enumerate(descriptors1):
@@ -196,7 +205,7 @@ def match_descriptors(descriptors1, descriptors2):
             dist_mat[i, j] = np.linalg.norm((d1 - d2), ord=2)
         candidates = np.argsort(dist_mat[i, :])
         best, second = candidates[:2]
-        if dist_mat[i, best] / dist_mat[i, second] <= 0.65:
+        if dist_mat[i, best] / dist_mat[i, second] <= RATIO_THRES:
             matches.append((i, best))
 
     return matches
@@ -288,7 +297,6 @@ def compute_affine_xform(corners1, corners2, matches):
         after RANSAC, then `outlier_labels[42]` should have value `True`.
     """
     N = 100
-    THRES = 10
     MIN_MATCHES = 3
     N_MATCHES = len(matches)
     matches = np.array(matches)
@@ -304,7 +312,7 @@ def compute_affine_xform(corners1, corners2, matches):
         loss = np.matmul(src, t) - dst
         loss = loss.reshape(N_MATCHES, 2)
         distances = np.sqrt(np.sum(loss**2, axis=1))
-        inliers = distances < THRES
+        inliers = distances < DIST_THRES
         if np.sum(inliers) > max_inliers:
             max_inliers = np.sum(inliers)
             A, b = _formulate_lstsq(
@@ -343,9 +351,9 @@ def stitch_images(image1, image2, xform):
 
 
 def main():
-    img_name = 'bikes'
-    img_id1 = 2
-    img_id2 = 3
+    img_name = 'leuven'
+    img_id1 = 1
+    img_id2 = 2
     img_path1 = f'data/{img_name}{img_id1}.png'
     img_path2 = f'data/{img_name}{img_id2}.png'
 
