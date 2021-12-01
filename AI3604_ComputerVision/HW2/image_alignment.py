@@ -75,6 +75,20 @@ def _check_window_validity(
         x: int,
         y: int,
         shape: Tuple) -> bool:
+    """Checks if a window lies too close to the border,
+    in which case the histogram cannot be computed.
+
+    NOTE: Assumes the window size is (17, 17)
+
+    Args:
+        - x (int): x coordinate of centroid
+        - y (int): y coordinate of centroid
+        - shape (Tuple): Shape of the image
+
+    Returns:
+        False if the window is too close to image border.
+        True otherwise
+    """
     y_max, x_max = shape
     if x + 8 + 1 >= x_max or x - 8 < 0:
         return False
@@ -136,17 +150,22 @@ def compute_descriptors(image: np.ndarray, corners, scales, orientations):
                 h = [0] * 8  # histogram
                 cob = grad_ori[
                     xb*BSZ: (xb+1)*BSZ,
-                    yb*BSZ: (yb+1)*BSZ]  # current (4,4) orientation block
+                    yb*BSZ: (yb+1)*BSZ]  # (4,4) orientation block
                 cmb = grad_mag[
                     xb*BSZ: (xb+1)*BSZ,
-                    yb*BSZ: (yb+1)*BSZ]  # current (4,4) orientation block
+                    yb*BSZ: (yb+1)*BSZ]  # (4,4) magnitude block
                 for o, m in zip(cob.flatten(), cmb.flatten()):
+                    # make orientation in (0, 2pi)
                     while o < 0:
                         o += 2 * np.pi
+
+                    # compute bins
                     relative_o = (o / (np.pi / 4))
                     lbin_idx = int(relative_o)
                     bli = relative_o - lbin_idx  # interpolation factor
                     bli /= (np.pi / 4)
+
+                    # assign current gradient to bins
                     h[lbin_idx % 8] += (1 - bli) * m
                     h[(lbin_idx + 1) % 8] += bli * m
                 hs.append(h)
@@ -282,8 +301,6 @@ def main():
     matches = match_descriptors(d1, d2)
     print(matches)
     visualization = draw_matches(img1, img2, c1, c2, matches)
-    # cv2.imshow('Match', visualization)
-    # cv2.waitKey()
     cv2.imwrite('./data/bikes_12.png', visualization.astype(np.uint8))
 
 
