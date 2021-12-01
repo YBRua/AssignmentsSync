@@ -52,8 +52,8 @@ def detect_blobs(image: np.ndarray):
     attr_list = archotech.AttributeCounter(labeled_blobs).get_attr_list()
 
     # For debugging and visualization purposes
-    annot_blobs = archotech.annotate_attributes(image, attr_list)
-    plt.imshow(annot_blobs)
+    # annot_blobs = archotech.annotate_attributes(image, attr_list)
+    # plt.imshow(annot_blobs)
     corners: List[Tuple] = []
     scales: List = []
     orientations: List = []
@@ -74,12 +74,11 @@ def detect_blobs(image: np.ndarray):
 def _check_window_validity(
         x: int,
         y: int,
-        scale: float,
         shape: Tuple) -> bool:
-    y_max, x_max = 8, 8
-    if x + scale + 1 >= x_max or x - scale < 0:
+    y_max, x_max = shape
+    if x + 8 + 1 >= x_max or x - 8 < 0:
         return False
-    if y + scale + 1 >= y_max or y - scale < 0:
+    if y + 8 + 1 >= y_max or y - 8 < 0:
         return False
     return True
 
@@ -109,7 +108,7 @@ def compute_descriptors(image: np.ndarray, corners, scales, orientations):
         x, y = int(x), int(y)
         scale = int(scale)
 
-        if not _check_window_validity(x, y, scale, image.shape):
+        if not _check_window_validity(x, y, image.shape):
             continue
 
         local: np.ndarray = image[y-8: y+8+1, x-8: x+8+1]
@@ -131,7 +130,6 @@ def compute_descriptors(image: np.ndarray, corners, scales, orientations):
         grad_ori = grad_ori[:16, :16]
         grad_mag = grad_mag[:16, :16]
         BSZ = 4  # block size
-        ORIS = np.linspace(0, 2*np.pi, 8, endpoint=False)
         hs = []
         for xb in range(4):
             for yb in range(4):
@@ -155,6 +153,8 @@ def compute_descriptors(image: np.ndarray, corners, scales, orientations):
         hs: np.ndarray = np.array(hs).reshape(-1)
         descriptors.append(hs)
 
+    print(len(descriptors))
+
     return descriptors
 
 
@@ -170,12 +170,17 @@ def match_descriptors(descriptors1, descriptors2):
         indices. Each tuple contains two integer indices. For example, tuple
         (0, 42) indicates that corners1[0] is matched to corners2[42].
     """
+    matches: List[Tuple] = []
     dist_mat = np.zeros((len(descriptors1), len(descriptors2)))
     for i, d1 in enumerate(descriptors1):
         for j, d2 in enumerate(descriptors2):
             dist_mat[i, j] = np.linalg.norm((d1 - d2), ord=2)
+        candidates = np.argsort(dist_mat[i, :])
+        best, second = candidates[:2]
+        if dist_mat[i, best] / dist_mat[i, second] <= 0.65:
+            matches.append((i, best))
 
-    print(dist_mat.shape)
+    return matches
 
 
 def draw_matches(image1, image2, corners1, corners2, matches,
@@ -194,7 +199,33 @@ def draw_matches(image1, image2, corners1, corners2, matches,
     - match_image (3D uint8 array): A color image having shape
         (max(H1, H2), W1 + W2, 3).
     """
-    raise NotImplementedError
+    offset = image1.shape[1]
+    match_image = np.concatenate((image1, image2), axis=1)
+    print(match_image.shape)
+    for c1idx, c2idx in matches:
+        x1, y1 = list(map(int, corners1[c1idx]))
+        x2, y2 = list(map(int, corners2[c2idx]))
+        x2 += offset
+        match_image = cv2.circle(
+            match_image,
+            (x1, y1),
+            radius=8,
+            color=(0, 255, 0),
+            thickness=-1)
+        match_image = cv2.circle(
+            match_image,
+            (x2, y2),
+            radius=8,
+            color=(0, 255, 0),
+            thickness=-1)
+        match_image = cv2.line(
+            match_image,
+            (x1, y1),
+            (x2, y2),
+            color=(255, 0, 0),
+            thickness=3)
+
+    return match_image
 
 
 def compute_affine_xform(corners1, corners2, matches):
@@ -248,7 +279,12 @@ def main():
     c2, s2, ori2 = detect_blobs(gray2)
     d1 = compute_descriptors(gray1, c1, s1, ori1)
     d2 = compute_descriptors(gray2, c2, s2, ori2)
-    match_descriptors(d1, d2)
+    matches = match_descriptors(d1, d2)
+    print(matches)
+    visualization = draw_matches(img1, img2, c1, c2, matches)
+    # cv2.imshow('Match', visualization)
+    # cv2.waitKey()
+    cv2.imwrite('./data/bikes_12.png', visualization.astype(np.uint8))
 
 
 if __name__ == '__main__':
