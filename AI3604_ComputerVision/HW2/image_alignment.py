@@ -44,7 +44,7 @@ def detect_blobs(image):
         # DoGs[i] *= (sigmas[i]**2)
         DoGs.append(NLoGs[i] - NLoGs[i-1])
 
-    local_maximums = scipy.ndimage.maximum_filter(DoGs, size=(3, 7, 7))
+    local_maximums = scipy.ndimage.maximum_filter(DoGs, size=(3, 3, 3))
 
     blobs = np.max(local_maximums, axis=0)
     thres = np.quantile(blobs, 0.9)
