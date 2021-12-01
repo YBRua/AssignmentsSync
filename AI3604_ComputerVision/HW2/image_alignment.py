@@ -22,7 +22,7 @@ def detect_blobs(image: np.ndarray):
     - orientations (list of floats): A list of floats representing the dominant
         orientation of the blobs.
     """
-    BLOB_THRESHOLD = 0.22
+    BLOB_THRESHOLD = 0.20
     sigma_0 = 5
     sigmas = []
     s = 1.25  # scaling factor
@@ -258,15 +258,15 @@ def _formulate_lstsq(corners1, corners2, n_matches, matches):
     b = np.zeros(2 * n_matches)
     for i, (c1idx, c2idx) in enumerate(matches):
         x1, y1 = list(map(int, corners1[c1idx]))
-        # x1 += 200
-        # y1 += 200
+        x1 += 200
+        y1 += 200
         x2, y2 = list(map(int, corners2[c2idx]))
-        # x2 += 200
-        # y2 += 200
-        A[i, :] = [x1, y1, 1, 0, 0, 0]
-        A[i+1, :] = [0, 0, 0, x1, y1, 1]
-        b[i] = x2
-        b[i+1] = y2
+        x2 += 200
+        y2 += 200
+        A[2*i, :] = [x1, y1, 1, 0, 0, 0]
+        A[2*i+1, :] = [0, 0, 0, x1, y1, 1]
+        b[2*i] = x2
+        b[2*i+1] = y2
     return A, b
 
 
@@ -302,8 +302,8 @@ def compute_affine_xform(corners1, corners2, matches):
             corners1, corners2, MIN_MATCHES, matches[samples])
         t = np.linalg.lstsq(A_, b_, rcond=1e-5)[0]  # (6,)
         loss = np.matmul(src, t) - dst
-        loss = loss.reshape(2, N_MATCHES)
-        distances = np.sqrt(np.sum(loss**2, axis=0))
+        loss = loss.reshape(N_MATCHES, 2)
+        distances = np.sqrt(np.sum(loss**2, axis=1))
         inliers = distances < THRES
         if np.sum(inliers) > max_inliers:
             max_inliers = np.sum(inliers)
@@ -364,17 +364,17 @@ def main():
     print(matches)
 
     xform, outliers = compute_affine_xform(c1, c2, matches)
-    print(xform)
+    print(xform.T)
 
     visualization = draw_matches(img1, img2, c1, c2, matches, outliers)
     cv2.imwrite(
         f'./data/{img_name}_{img_id1}{img_id2}_match.png',
         visualization.astype(np.uint8))
 
-    # stitched = stitch_images(img1, img2, xform)
-    # cv2.imwrite(
-    #     f'./data/{img_name}_{img_id1}{img_id2}_stitch.png',
-    #     stitched)
+    stitched = stitch_images(img1, img2, xform)
+    cv2.imwrite(
+        f'./data/{img_name}_{img_id1}{img_id2}_stitch.png',
+        stitched)
 
 
 if __name__ == '__main__':
