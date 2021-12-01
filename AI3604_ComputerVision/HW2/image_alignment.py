@@ -22,7 +22,7 @@ def detect_blobs(image: np.ndarray):
     - orientations (list of floats): A list of floats representing the dominant
         orientation of the blobs.
     """
-    BLOB_THRESHOLD = 0.225
+    BLOB_THRESHOLD = 0.22
     sigma_0 = 5
     sigmas = []
     s = 1.25  # scaling factor
@@ -218,10 +218,16 @@ def draw_matches(image1, image2, corners1, corners2, matches,
     - match_image (3D uint8 array): A color image having shape
         (max(H1, H2), W1 + W2, 3).
     """
+    if outlier_labels is None:
+        colors = [(255, 0, 0)] * len(matches)
+    else:
+        colors = [
+            (0, 0, 255) if is_outlier else (255, 0, 0)
+            for is_outlier in outlier_labels]
     offset = image1.shape[1]
     match_image = np.concatenate((image1, image2), axis=1)
     print(match_image.shape)
-    for c1idx, c2idx in matches:
+    for c, (c1idx, c2idx) in zip(colors, matches):
         x1, y1 = list(map(int, corners1[c1idx]))
         x2, y2 = list(map(int, corners2[c2idx]))
         x2 += offset
@@ -229,7 +235,7 @@ def draw_matches(image1, image2, corners1, corners2, matches,
             match_image,
             (x1, y1),
             (x2, y2),
-            color=(255, 0, 0),
+            color=c,
             thickness=3)
         match_image = cv2.circle(
             match_image,
@@ -245,6 +251,23 @@ def draw_matches(image1, image2, corners1, corners2, matches,
             thickness=-1)
 
     return match_image
+
+
+def _formulate_lstsq(corners1, corners2, n_matches, matches):
+    A = np.zeros((2 * n_matches, 6))
+    b = np.zeros(2 * n_matches)
+    for i, (c1idx, c2idx) in enumerate(matches):
+        x1, y1 = list(map(int, corners1[c1idx]))
+        # x1 += 200
+        # y1 += 200
+        x2, y2 = list(map(int, corners2[c2idx]))
+        # x2 += 200
+        # y2 += 200
+        A[i, :] = [x1, y1, 1, 0, 0, 0]
+        A[i+1, :] = [0, 0, 0, x1, y1, 1]
+        b[i] = x2
+        b[i+1] = y2
+    return A, b
 
 
 def compute_affine_xform(corners1, corners2, matches):
@@ -264,7 +287,34 @@ def compute_affine_xform(corners1, corners2, matches):
         For example, if `matches[42]` is determined as an outlier match
         after RANSAC, then `outlier_labels[42]` should have value `True`.
     """
-    raise NotImplementedError
+    N = 100
+    THRES = 10
+    MIN_MATCHES = 3
+    N_MATCHES = len(matches)
+    matches = np.array(matches)
+    src, dst = _formulate_lstsq(  # (2n, 6), (2n,)
+        corners1, corners2, N_MATCHES, matches)
+    max_inliers = -1
+    xform = np.zeros((3, 3))
+    for _ in range(N):
+        samples = np.random.randint(matches.shape[0], size=(3,))
+        A_, b_ = _formulate_lstsq(  # (2m, 6), (2m,)
+            corners1, corners2, MIN_MATCHES, matches[samples])
+        t = np.linalg.lstsq(A_, b_, rcond=1e-5)[0]  # (6,)
+        loss = np.matmul(src, t) - dst
+        loss = loss.reshape(2, N_MATCHES)
+        distances = np.sqrt(np.sum(loss**2, axis=0))
+        inliers = distances < THRES
+        if np.sum(inliers) > max_inliers:
+            max_inliers = np.sum(inliers)
+            A, b = _formulate_lstsq(
+                corners1, corners2, max_inliers, matches[inliers])
+            t = np.linalg.lstsq(A, b, rcond=1e-5)[0]
+            xform[0, :] = t[:3]
+            xform[1, :] = t[3:]
+            xform[2, 2] = 1
+            outliers = ~inliers
+    return xform, outliers
 
 
 def stitch_images(image1, image2, xform):
@@ -280,12 +330,24 @@ def stitch_images(image1, image2, xform):
     Returns:
     - image_stitched (3D uint8 array)
     """
-    raise NotImplementedError
+    image1 = np.pad(image1, [(200, 200), (200, 200), (0, 0)])
+    image2 = np.pad(image2, [(200, 200), (200, 200), (0, 0)])
+    image_warped: np.ndarray = cv2.warpAffine(
+        image1,
+        xform[:2],
+        image2.shape[:2][::-1])
+    image_stitched = image_warped.astype(np.float32)\
+        + image2.astype(np.float32)
+    image_stitched[(image2 > 1e-3) & (image_warped > 1e-3)] /= 2.0
+    return image_stitched.astype(np.uint8)
 
 
 def main():
-    img_path1 = 'data/bikes1.png'
-    img_path2 = 'data/bikes2.png'
+    img_name = 'bikes'
+    img_id1 = 2
+    img_id2 = 3
+    img_path1 = f'data/{img_name}{img_id1}.png'
+    img_path2 = f'data/{img_name}{img_id2}.png'
 
     img1 = cv2.imread(img_path1, cv2.IMREAD_COLOR)
     img2 = cv2.imread(img_path2, cv2.IMREAD_COLOR)
@@ -300,8 +362,19 @@ def main():
     d2 = compute_descriptors(gray2, c2, s2, ori2)
     matches = match_descriptors(d1, d2)
     print(matches)
-    visualization = draw_matches(img1, img2, c1, c2, matches)
-    cv2.imwrite('./data/bikes_12.png', visualization.astype(np.uint8))
+
+    xform, outliers = compute_affine_xform(c1, c2, matches)
+    print(xform)
+
+    visualization = draw_matches(img1, img2, c1, c2, matches, outliers)
+    cv2.imwrite(
+        f'./data/{img_name}_{img_id1}{img_id2}_match.png',
+        visualization.astype(np.uint8))
+
+    # stitched = stitch_images(img1, img2, xform)
+    # cv2.imwrite(
+    #     f'./data/{img_name}_{img_id1}{img_id2}_stitch.png',
+    #     stitched)
 
 
 if __name__ == '__main__':
