@@ -411,8 +411,8 @@ def stitch_images(image1, image2, xform):
 
 def main():
     img_name = 'wall'
-    img_id1 = 1
-    img_id2 = 2
+    img_id1 = 2
+    img_id2 = 3
     img_path1 = f'data/{img_name}{img_id1}.png'
     img_path2 = f'data/{img_name}{img_id2}.png'
 
