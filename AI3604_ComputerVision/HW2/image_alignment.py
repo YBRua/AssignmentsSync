@@ -4,10 +4,10 @@ import archotech
 import numpy as np
 import scipy.ndimage
 from typing import List, Tuple
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 
-BLOB_THRES = 0.25
+BLOB_QUANTILE = 0.8
 RATIO_THRES = 0.7
 DIST_THRES = 12
 
@@ -28,23 +28,23 @@ def detect_blobs(image):
     sigma_0 = 5
     sigmas = []
     s = 1.5  # scaling factor
-    NLoGs = []
+    gaussian_images = []
     MAX_K = 6
     for k in range(MAX_K):
         sigmas.append(sigma_0 * (s ** k))
     for k in range(MAX_K):
         sigma = sigmas[k]
         filtered = scipy.ndimage.gaussian_filter(image, sigma)
-        NLoGs.append(filtered)
+        gaussian_images.append(filtered)
 
         # plt.imshow(local_maximum)
         # plt.show()
-    DoGs = np.diff(NLoGs, n=1, axis=0)
+    DoGs = np.diff(gaussian_images, n=1, axis=0)
 
     local_maximums = scipy.ndimage.maximum_filter(DoGs, size=(3, 3, 3))
 
     blobs = np.max(local_maximums, axis=0)
-    thres = np.quantile(blobs, 0.9)
+    thres = np.quantile(blobs, BLOB_QUANTILE)
     sizes = np.argmax(local_maximums, axis=0)
     blob_bin: np.ndarray = np.where(blobs >= thres, 255, 0)
 
@@ -53,18 +53,62 @@ def detect_blobs(image):
 
     # For debugging and visualization purposes
     # annot_blobs = archotech.annotate_attributes(image, attr_list)
-    # plt.imshow(blobs)
-    # plt.show()
+    plt.imshow(blobs)
+    plt.show()
 
     corners: List[Tuple] = []
     scales: List = []
     orientations: List = []
 
-    for attr in attr_list:
-        x, y = attr['position']['x'], attr['position']['y']
-        corners.append((x, y))
-        scales.append(sigmas[sizes[int(y), int(x)]])
-        orientations.append(attr['orientation'])
+    for blob_attr in attr_list:
+        x_, y_ = blob_attr['position']['x'], blob_attr['position']['y']
+        x, y = int(x_), int(y_)
+        scale = sigmas[sizes[y, x]]
+
+        g_image = gaussian_images[sizes[y, x]]
+
+        if not _check_window_validity(x, y, image.shape):
+            continue
+
+        local: np.ndarray = g_image[y-8: y+8+1, x-8: x+8+1]
+        dx, dy = np.gradient(local)
+        grad_mag = np.sqrt(np.square(dx) + np.square(dy))
+        grad_ori = np.arctan2(dx, dy)
+
+        # add gaussian weight to magnitude
+        gaussian = cv2.getGaussianKernel(
+            17, sigma=1.5*scale, ktype=cv2.CV_64F)
+        gaussian = np.matmul(gaussian, gaussian.T)
+        grad_mag = np.multiply(grad_mag, gaussian)
+
+        grad_hist = np.zeros(36)
+        for yy in range(grad_ori.shape[0]):
+            for xx in range(grad_ori.shape[1]):
+                o = grad_ori[yy, xx]
+                m = grad_mag[yy, xx]
+                while o < 0:
+                    o += 2 * np.pi
+
+                # compute bins
+                relative_o = (o / (np.pi / 18))
+                lbin_idx = int(relative_o)
+                bli = relative_o - lbin_idx  # interpolation factor
+
+                # assign current gradient to bins
+                grad_hist[lbin_idx % 8] += (1 - bli) * m
+                grad_hist[(lbin_idx + 1) % 8] += bli * m
+
+        candidates = np.argsort(grad_hist)
+        best = candidates[-1]
+        for c in candidates[:-1]:
+            if grad_hist[c] / grad_hist[best] >= 0.8:
+                corners.append((x, y))
+                scales.append(scale)
+                orientations.append(grad_hist[c])
+
+        corners.append((x_, y_))
+        scales.append(scale)
+        orientations.append(grad_hist[best])
 
     # print(corners)
     # print(scales)
@@ -131,7 +175,7 @@ def compute_descriptors(image: np.ndarray, corners, scales, orientations):
         local: np.ndarray = image[y-8: y+8+1, x-8: x+8+1]
         dx, dy = np.gradient(local)
 
-        grad_mag = np.sqrt(np.square(x) + np.square(y))
+        grad_mag = np.sqrt(np.square(dx) + np.square(dy))
         grad_ori = np.arctan2(dx, dy)
 
         # normalize gradient orientation
@@ -181,8 +225,6 @@ def compute_descriptors(image: np.ndarray, corners, scales, orientations):
         # re-normalize
         hs = hs / np.linalg.norm(hs, ord=2)
         descriptors.append(hs)
-
-    print(len(descriptors))
 
     return descriptors
 
@@ -238,9 +280,11 @@ def draw_matches(image1, image2, corners1, corners2, matches,
         colors = [
             (0, 0, 255) if is_outlier else (255, 0, 0)
             for is_outlier in outlier_labels]
+    H = max(image1.shape[0], image2.shape[0])
+    image1 = np.pad(image1, [(0, max(0, H-image1.shape[0])), (0, 0), (0, 0)])
+    image2 = np.pad(image2, [(0, max(0, H-image2.shape[0])), (0, 0), (0, 0)])
     offset = image1.shape[1]
     match_image = np.concatenate((image1, image2), axis=1)
-    print(match_image.shape)
     for c, (c1idx, c2idx) in zip(colors, matches):
         x1, y1 = list(map(int, corners1[c1idx]))
         x2, y2 = list(map(int, corners2[c2idx]))
@@ -301,6 +345,9 @@ def compute_affine_xform(corners1, corners2, matches):
         For example, if `matches[42]` is determined as an outlier match
         after RANSAC, then `outlier_labels[42]` should have value `True`.
     """
+    if len(matches) < 3:
+        print(f"Not enough matches! Expected at least 3. Got {len(matches)}")
+        return None, None
     N = 100
     MIN_MATCHES = 3
     N_MATCHES = len(matches)
@@ -356,9 +403,9 @@ def stitch_images(image1, image2, xform):
 
 
 def main():
-    img_name = 'graf'
+    img_name = 'wall'
     img_id1 = 1
-    img_id2 = 3
+    img_id2 = 2
     img_path1 = f'data/{img_name}{img_id1}.png'
     img_path2 = f'data/{img_name}{img_id2}.png'
 
@@ -369,20 +416,31 @@ def main():
     gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY) / 255.0
 
     # TODO
+    print(f'Matching {img_name} {img_id1} and {img_id2}')
+
     c1, s1, ori1 = detect_blobs(gray1)
     c2, s2, ori2 = detect_blobs(gray2)
+
+    print('Num of Blobs:', len(c1), len(c2))
+
     d1 = compute_descriptors(gray1, c1, s1, ori1)
     d2 = compute_descriptors(gray2, c2, s2, ori2)
+
+    print('Num of Descriptors', len(d1), len(d2))
+
     matches = match_descriptors(d1, d2)
-    print(matches)
+    print('Matches:', matches)
 
     xform, outliers = compute_affine_xform(c1, c2, matches)
-    print(xform.T)
 
     visualization = draw_matches(img1, img2, c1, c2, matches, outliers)
     cv2.imwrite(
         f'./data/{img_name}_{img_id1}{img_id2}_match.png',
         visualization.astype(np.uint8))
+
+    if xform is None:
+        print('Matching failed. Exiting.')
+        return
 
     stitched = stitch_images(img1, img2, xform)
     cv2.imwrite(
