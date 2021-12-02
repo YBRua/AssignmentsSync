@@ -166,13 +166,20 @@ def compute_descriptors(image: np.ndarray, corners, scales, orientations):
                     relative_o = (o / (np.pi / 4))
                     lbin_idx = int(relative_o)
                     bli = relative_o - lbin_idx  # interpolation factor
-                    bli /= (np.pi / 4)
 
                     # assign current gradient to bins
                     h[lbin_idx % 8] += (1 - bli) * m
                     h[(lbin_idx + 1) % 8] += bli * m
                 hs.append(h)
         hs: np.ndarray = np.array(hs).reshape(-1)
+
+        # normalization according to SIFT paper
+        # normalize to unit length
+        hs = hs / np.linalg.norm(hs, ord=2)
+        # restrict each to be no longer than 0.2
+        hs = np.clip(hs, -0.2, 0.2)
+        # re-normalize
+        hs = hs / np.linalg.norm(hs, ord=2)
         descriptors.append(hs)
 
     print(len(descriptors))
@@ -349,9 +356,9 @@ def stitch_images(image1, image2, xform):
 
 
 def main():
-    img_name = 'leuven'
+    img_name = 'graf'
     img_id1 = 1
-    img_id2 = 2
+    img_id2 = 3
     img_path1 = f'data/{img_name}{img_id1}.png'
     img_path2 = f'data/{img_name}{img_id2}.png'
 
