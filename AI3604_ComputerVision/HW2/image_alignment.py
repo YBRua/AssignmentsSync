@@ -7,7 +7,7 @@ from typing import List, Tuple
 import matplotlib.pyplot as plt
 
 
-BLOB_QUANTILE = 0.8
+BLOB_QUANTILE = 0.975
 RATIO_THRES = 0.7
 DIST_THRES = 12
 
@@ -53,7 +53,7 @@ def detect_blobs(image):
 
     # For debugging and visualization purposes
     # annot_blobs = archotech.annotate_attributes(image, attr_list)
-    plt.imshow(blobs)
+    plt.imshow(labeled_blobs)
     plt.show()
 
     corners: List[Tuple] = []
@@ -71,7 +71,14 @@ def detect_blobs(image):
             continue
 
         local: np.ndarray = g_image[y-8: y+8+1, x-8: x+8+1]
-        dx, dy = np.gradient(local)
+        try:
+            # sometimes blob size is too small to compute gradient
+            dx, dy = np.gradient(local)
+        except ValueError:
+            corners.append((x_, y_))
+            scales.append(scale)
+            orientations.append(blob_attr['orientation'])
+            continue
         grad_mag = np.sqrt(np.square(dx) + np.square(dy))
         grad_ori = np.arctan2(dx, dy)
 
