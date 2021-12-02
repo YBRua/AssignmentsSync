@@ -158,7 +158,7 @@ class ImageDivider():
                     objs[label] = self._assign_new_label()
 
         print('Num of objects (including BG):', len(objs.keys()))
-        if len(objs.keys) > 255:
+        if len(objs.keys()) > 255:
             raise ValueError('This implementation only supports < 255 objs')
 
         # third pass for coloring
