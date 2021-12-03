@@ -22,14 +22,19 @@ def choose_a_node(high, low=0) -> int:
     return random.randint(low, high-1)
 
 
+def normalized_cosine_similiarty(x: torch.Tensor, y: torch.Tensor):
+    return (torch.cosine_similarity(x, y) + 1) / 2
+
+
 def calc_auc(D0: torch.LongTensor, D1: torch.LongTensor, model: nn.Module):
     model.eval()
-    pred_D0 = model.forward(D0)  # B,2,Emb
-    pred_D1 = model.forward(D1)  # B,2,Emb
-    prob_D0 = torch.cosine_similarity(pred_D0[:, 0, :], pred_D0[:, 1, :])
-    prob_D1 = torch.cosine_similarity(pred_D1[:, 0, :], pred_D1[:, 1, :])
-    prob_D1_ext = prob_D1.repeat_interleave(prob_D0.shape[0])
-    prob_D0_ext = prob_D0.repeat(prob_D1.shape[0])
-    auc = torch.sum(prob_D0_ext < prob_D1_ext).float()\
-        / prob_D0.shape[0] / prob_D1.shape[0]
+    pred0 = model.forward(D0)  # B,2,Emb
+    pred1 = model.forward(D1)  # B,2,Emb
+    prob0 = normalized_cosine_similiarty(pred0[:, 0, :], pred0[:, 1, :])
+    prob1 = normalized_cosine_similiarty(pred1[:, 0, :], pred1[:, 1, :])
+    prob1_ext = prob1.repeat_interleave(prob0.shape[0])
+    prob0_ext = prob0.repeat(prob1.shape[0])
+    auc = torch.sum(prob0_ext < prob1_ext).float()\
+        / prob0.shape[0] / prob1.shape[0]
+    model.train()
     return auc

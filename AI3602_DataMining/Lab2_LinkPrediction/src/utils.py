@@ -31,15 +31,23 @@ def parse_args():
         help='Path to test set (csv file)')
     parser.add_argument(
         '--file_output', '-o', type=str,
-        default='./src/res.csv',
+        default='./prediction.csv',
         help='Path of output prediction result')
     parser.add_argument(
         '--model_save', '-s', type=str,
-        default='./src/model.pt',
+        default='./baseline.pt',
         help='Path to save the model')
     parser.add_argument(
         '--pretrained_path', '-p', type=str,
         default='',
         help='Path to a pretrained embedding model (.pt file)')
+    parser.add_argument(
+        '--split_dataset', dest='split_dataset',
+        action='store_true',
+        help='Whether to split the dataset into training and evaluation.')
+    parser.add_argument(
+        '--fancy_graphics', '-f', dest='fancy',
+        action='store_true',
+        help='Whether to plot fancy loss and auc curves.')
 
     return parser.parse_args()
