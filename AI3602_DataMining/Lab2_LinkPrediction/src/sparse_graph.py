@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.sparse as sparse
 from collections import defaultdict as ddict
+from utils import load_edges
 from typing import List
 
 
@@ -24,3 +25,12 @@ class SparseGraph():
 
     def get_degree(self, node: int) -> int:
         return self.degrees[node]
+
+    @classmethod
+    def build_graph_from_csv(cls, path: str):
+        edges = load_edges(path).T
+        srcs, dsts = edges[0], edges[1]
+        coo = sparse.coo_matrix(
+            (np.ones(edges.shape[1]), (srcs, dsts)))
+        coo.sum_duplicates()
+        return cls(coo)
