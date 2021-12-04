@@ -26,7 +26,7 @@ def train_procedure(
         eval: np.ndarray,
         train: np.ndarray,
         graph: SparseGraph,
-        model: nn.Module,
+        model: SkipGram,
         optimizer: optim.Optimizer,
         walker: RandomWalker,
         loss_metric: NegativeSamplingLoss):
@@ -72,25 +72,26 @@ def train_procedure(
             preds = model.forward(x)
             loss = loss_metric(model, preds, current_bsize)
             loss.backward()
-            tot_loss += loss.item()
             optimizer.step()
+            tot_loss += loss.item()
             t.set_description(f'Epoch: {e:2d} Loss: {tot_loss / (bidx+1):.4f}')
             bidx += 1
         model.eval()
 
-        if eval is not None:
-            k = eval.shape[0]
-            pos_tests = torch.tensor(eval)
-            neg_tests = get_negative_tests(graph, k)
-        else:
-            k = 2000
-            neg_tests = get_negative_tests(graph, k)
-            pos_tests = torch.tensor(
-                train[random.choices(list(range(train.shape[0])), k=k)])
+        with torch.no_grad():
+            if eval is not None:
+                k = eval.shape[0]
+                pos_tests = torch.tensor(eval)
+                neg_tests = get_negative_tests(graph, k)
+            else:
+                k = 5000
+                neg_tests = get_negative_tests(graph, k)
+                pos_tests = torch.tensor(
+                    train[random.choices(list(range(train.shape[0])), k=k)])
 
-        neg_tests = neg_tests.to(DEVICE)
-        pos_tests = pos_tests.to(DEVICE)
-        auc = calc_auc(neg_tests, pos_tests, model)
+            neg_tests = neg_tests.to(DEVICE)
+            pos_tests = pos_tests.to(DEVICE)
+            auc = calc_auc(neg_tests, pos_tests, model)
 
         losses.append(tot_loss / bidx)
         aucs.append(auc.item())
@@ -101,8 +102,11 @@ def train_procedure(
 
 
 def inference_procedure(model: nn.Module, tests: torch.Tensor) -> torch.Tensor:
-    preds = model.forward(tests)
-    return normalized_cosine_similiarty(preds[:, 0, :], preds[:, 1, :])
+    model.eval()
+    with torch.no_grad():
+        preds = model.forward(tests)
+        probs = normalized_cosine_similiarty(preds[:, 0, :], preds[:, 1, :])
+        return probs
 
 
 def output_to_csv(res: np.ndarray, path: str):
@@ -128,7 +132,7 @@ def main():
 
     # hyper params
     EMBEDDING_DIM = 64
-    LR = 10  # learning rate
+    LR = 1e-1  # learning rate
     MMT = 0.9  # momentum
 
     # hyper params for biased random walker
@@ -178,8 +182,6 @@ def main():
         model.load_state_dict(torch.load(PRETRAINED_MODEL))
         model.eval()
 
-    probs = inference_procedure(model, test_x)
-
     if args.fancy:
         print('Going fancy.')
         sns.set_theme('notebook', 'white', 'pastel')
@@ -194,6 +196,8 @@ def main():
         fig.tight_layout()
         sns.despine()
         plt.show()
+    
+    probs = inference_procedure(model, test_x)
 
     probs = probs.detach().cpu().numpy()
     output_to_csv(probs, OUTPUT_PATH)

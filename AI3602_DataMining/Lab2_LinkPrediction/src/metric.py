@@ -23,6 +23,11 @@ def choose_a_node(high, low=0) -> int:
 
 
 def normalized_cosine_similiarty(x: torch.Tensor, y: torch.Tensor):
+    # cosine_sim = torch.cosine_similarity(x, y)
+    # cosine_sim = cosine_sim - cosine_sim.min()
+    # cosine_sim = cosine_sim / cosine_sim.max()
+
+    # return cosine_sim
     return (torch.cosine_similarity(x, y) + 1) / 2
 
 
@@ -36,5 +41,4 @@ def calc_auc(D0: torch.LongTensor, D1: torch.LongTensor, model: nn.Module):
     prob0_ext = prob0.repeat(prob1.shape[0])
     auc = torch.sum(prob0_ext < prob1_ext).float()\
         / prob0.shape[0] / prob1.shape[0]
-    model.train()
     return auc
