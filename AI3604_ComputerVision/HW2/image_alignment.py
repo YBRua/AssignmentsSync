@@ -4,7 +4,7 @@ import archotech
 import numpy as np
 import scipy.ndimage
 from typing import List, Tuple
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 
 BLOB_QUANTILE = 0.975
@@ -53,69 +53,73 @@ def detect_blobs(image):
 
     # For debugging and visualization purposes
     # annot_blobs = archotech.annotate_attributes(image, attr_list)
-    plt.imshow(labeled_blobs)
-    plt.show()
+    # plt.imshow(labeled_blobs)
+    # plt.show()
 
     corners: List[Tuple] = []
     scales: List = []
     orientations: List = []
 
     for blob_attr in attr_list:
-        x_, y_ = blob_attr['position']['x'], blob_attr['position']['y']
-        x, y = int(x_), int(y_)
-        scale = sigmas[sizes[y, x]]
+        # x_, y_ = blob_attr['position']['x'], blob_attr['position']['y']
+        # x, y = int(x_), int(y_)
+        # scale = sigmas[sizes[y, x]]
 
-        g_image = gaussian_images[sizes[y, x]]
+        # g_image = gaussian_images[sizes[y, x]]
 
-        if not _check_window_validity(x, y, image.shape):
-            continue
+        # if not _check_window_validity(x, y, image.shape):
+        #     continue
 
-        local: np.ndarray = g_image[y-8: y+8+1, x-8: x+8+1]
-        try:
-            # sometimes blob size is too small to compute gradient
-            dx, dy = np.gradient(local)
-        except ValueError:
-            corners.append((x_, y_))
-            scales.append(scale)
-            orientations.append(blob_attr['orientation'])
-            continue
-        grad_mag = np.sqrt(np.square(dx) + np.square(dy))
-        grad_ori = np.arctan2(dx, dy)
+        # local: np.ndarray = g_image[y-8: y+8+1, x-8: x+8+1]
+        # try:
+        #     # sometimes blob size is too small to compute gradient
+        #     dx, dy = np.gradient(local)
+        # except ValueError:
+        #     corners.append((x_, y_))
+        #     scales.append(scale)
+        #     orientations.append(blob_attr['orientation'])
+        #     continue
+        # grad_mag = np.sqrt(np.square(dx) + np.square(dy))
+        # grad_ori = np.arctan2(dx, dy)
 
-        # add gaussian weight to magnitude
-        gaussian = cv2.getGaussianKernel(
-            17, sigma=1.5*scale, ktype=cv2.CV_64F)
-        gaussian = np.matmul(gaussian, gaussian.T)
-        grad_mag = np.multiply(grad_mag, gaussian)
+        # # add gaussian weight to magnitude
+        # gaussian = cv2.getGaussianKernel(
+        #     17, sigma=1.5*scale, ktype=cv2.CV_64F)
+        # gaussian = np.matmul(gaussian, gaussian.T)
+        # grad_mag = np.multiply(grad_mag, gaussian)
 
-        grad_hist = np.zeros(36)
-        for yy in range(grad_ori.shape[0]):
-            for xx in range(grad_ori.shape[1]):
-                o = grad_ori[yy, xx]
-                m = grad_mag[yy, xx]
-                while o < 0:
-                    o += 2 * np.pi
+        # grad_hist = np.zeros(36)
+        # for yy in range(grad_ori.shape[0]):
+        #     for xx in range(grad_ori.shape[1]):
+        #         o = grad_ori[yy, xx]
+        #         m = grad_mag[yy, xx]
+        #         while o < 0:
+        #             o += 2 * np.pi
 
-                # compute bins
-                relative_o = (o / (np.pi / 18))
-                lbin_idx = int(relative_o)
-                bli = relative_o - lbin_idx  # interpolation factor
+        #         # compute bins
+        #         relative_o = (o / (np.pi / 18))
+        #         lbin_idx = int(relative_o)
+        #         bli = relative_o - lbin_idx  # interpolation factor
 
-                # assign current gradient to bins
-                grad_hist[lbin_idx % 8] += (1 - bli) * m
-                grad_hist[(lbin_idx + 1) % 8] += bli * m
+        #         # assign current gradient to bins
+        #         grad_hist[lbin_idx % 8] += (1 - bli) * m
+        #         grad_hist[(lbin_idx + 1) % 8] += bli * m
 
-        candidates = np.argsort(grad_hist)
-        best = candidates[-1]
-        for c in candidates[:-1]:
-            if grad_hist[c] / grad_hist[best] >= 0.8:
-                corners.append((x, y))
-                scales.append(scale)
-                orientations.append(grad_hist[c])
+        # candidates = np.argsort(grad_hist)
+        # best = candidates[-1]
+        # for c in candidates[:-1]:
+        #     if grad_hist[c] / grad_hist[best] >= 0.8:
+        #         corners.append((x, y))
+        #         scales.append(scale)
+        #         orientations.append(grad_hist[c])
 
-        corners.append((x_, y_))
-        scales.append(scale)
-        orientations.append(grad_hist[best])
+        # corners.append((x_, y_))
+        # scales.append(scale)
+        # orientations.append(grad_hist[best])
+        x, y = blob_attr['position']['x'], blob_attr['position']['y']
+        corners.append((x, y))
+        scales.append(sigmas[sizes[int(y), int(x)]])
+        orientations.append(blob_attr['orientation'])
 
     # print(corners)
     # print(scales)
