@@ -19,6 +19,26 @@ def parse_args():
         '--neg_samples', '-n', type=int, default=12,
         help='Number of negative samples when computing loss')
     parser.add_argument(
+        '--walker_return_param', type=float, default=1,
+        help='Return parameter for the biased random walker.'
+        + ' Determines the likelihood it returns to previous node.')
+    parser.add_argument(
+        '--walker_io_param', type=float, default=1,
+        help='In/Out parameter for the biased random walker.'
+        + ' Determines the likelihood it moves further away.')
+    parser.add_argument(
+        '--walk_length', type=int, default=15,
+        help='Length for each random walk')
+    parser.add_argument(
+        '--window_size', type=int, default=5,
+        help='Window size for a neighbourhood of nodes in the walk trajectory')
+    parser.add_argument(
+        '--lr', type=float, default=0.1,
+        help='Learning rate for SGD')
+    parser.add_argument(
+        '--mmt', type=float, default=0.9,
+        help='Momentum for SGD')
+    parser.add_argument(
         '--device', '-d', type=str, default='cuda:0',
         help='PyTorch style device to run the model')
     parser.add_argument(

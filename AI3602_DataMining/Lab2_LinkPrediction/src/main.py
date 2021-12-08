@@ -4,10 +4,10 @@ import random
 import numpy as np
 import pandas as pd
 import torch.nn as nn
-import seaborn as sns
+# import seaborn as sns
 import torch.optim as optim
 import scipy.sparse as sparse
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 from typing import List
@@ -37,8 +37,8 @@ def train_procedure(
     DEVICE = args.device
 
     # random walk hyper params
-    WALK_LENGTH = 15
-    WINDOW_SIZE = 5
+    WALK_LENGTH = args.walk_length
+    WINDOW_SIZE = args.window_size
 
     losses = []
     aucs = []
@@ -132,12 +132,12 @@ def main():
 
     # hyper params
     EMBEDDING_DIM = 64
-    LR = 1e-1  # learning rate
-    MMT = 0.9  # momentum
+    LR = args.lr  # learning rate
+    MMT = args.mmt  # momentum
 
     # hyper params for biased random walker
-    RETURN_PARAM = 1
-    IO_PARAM = 1
+    RETURN_PARAM = args.walker_return_param
+    IO_PARAM = args.walker_io_param
 
     # build sparse graph
     G = SparseGraph.build_graph_from_csv(EDGE_PATH)
@@ -182,21 +182,21 @@ def main():
         model.load_state_dict(torch.load(PRETRAINED_MODEL))
         model.eval()
 
-    if args.fancy:
-        print('Going fancy.')
-        sns.set_theme('notebook', 'white', 'pastel')
-        fig, ax = plt.subplots(1, 2, figsize=(8, 4))
-        ax[0].plot(losses, label='loss')
-        ax[0].set_xlabel('epoch')
-        ax[0].set_ylabel('loss')
-        ax[1].plot(aucs, label='auc')
-        ax[1].set_title('AUC-Epoch')
-        ax[1].set_xlabel('epoch')
-        ax[1].set_ylabel('auc')
-        fig.tight_layout()
-        sns.despine()
-        plt.show()
-    
+    # if args.fancy:
+    #     print('Going fancy.')
+    #     sns.set_theme('notebook', 'white', 'pastel')
+    #     fig, ax = plt.subplots(1, 2, figsize=(8, 4))
+    #     ax[0].plot(losses, label='loss')
+    #     ax[0].set_xlabel('epoch')
+    #     ax[0].set_ylabel('loss')
+    #     ax[1].plot(aucs, label='auc')
+    #     ax[1].set_title('AUC-Epoch')
+    #     ax[1].set_xlabel('epoch')
+    #     ax[1].set_ylabel('auc')
+    #     fig.tight_layout()
+    #     sns.despine()
+    #     plt.show()
+
     probs = inference_procedure(model, test_x)
 
     probs = probs.detach().cpu().numpy()
