@@ -6,7 +6,13 @@ __pycache__
 
 # arpa file for NLP
 *.arpa
+# Dataset for NLP
+CS3602_NaturalLanguageProcessing/Projects/Project02_CBOW/data/
+CS3602_NaturalLanguageProcessing/Projects/Project02_CBOW/ckpt/
 
 # .pt file for whatever model
 *.pt
 *.pth
+
+# pickles
+*.pkl
