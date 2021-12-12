@@ -1,5 +1,6 @@
 import os
 import pickle
+from scipy.special import logsumexp
 import time
 from os.path import join
 from typing import List
@@ -65,12 +66,32 @@ class CBOW:
         """
 
         # ==== TODO: Construct one-hot vectors ====
+        V = len(self.vocab)
+        ctx_idx = [self.vocab.token_to_idx(token) for token in context_tokens]
+        tgt_idx = self.vocab.token_to_idx(target_token)
+        ctx_onehot = np.concatenate(
+            [np.expand_dims(one_hot(V, c), -1) for c in ctx_idx], axis=-1)
+        tgt_onehot = np.expand_dims(one_hot(V, tgt_idx), axis=-1)
 
         # ==== TODO: Forward step ====
+        hid = np.matmul(self.W1.T, ctx_onehot)  # N, Ctx
+        hid = np.mean(hid, axis=-1, keepdims=True)
+        out = np.matmul(self.W2.T, hid)
+        sftmx = np.exp(out) / np.sum(np.exp(out))
 
         # ==== TODO: Calculate loss ====
+        loss = - np.log(sftmx[tgt_idx]).item()
 
         # ==== TODO: Update parameters ====
+        dloss_dout = sftmx - tgt_onehot  # V, 1
+        dloss_dW2 = np.matmul(hid, dloss_dout.T)  # N, V
+        dloss_dh = np.matmul(self.W2, dloss_dout)  # N, 1
+        dloss_dW1 = np.matmul(
+            np.mean(ctx_onehot, axis=-1, keepdims=True),
+            dloss_dh.T)  # V, N
+
+        self.W1 -= learning_rate * dloss_dW1
+        self.W2 -= learning_rate * dloss_dW2
 
         return loss
 

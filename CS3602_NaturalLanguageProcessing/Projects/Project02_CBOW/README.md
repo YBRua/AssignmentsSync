@@ -11,7 +11,8 @@
 请补全`word2vec.py`中的`train_one_step`函数，并成功运行`python main.py`
 
 main.py中包含3个测试点：
-```
+
+```text
 test1: 用于调试模型，如果实现正确，那么最终的loss将会停留在1.0左右，且'i','he','she'三者的相似性较高。
 test2: 用实现的模型在data/treebank.txt上训练10个epoch。此部分最终的loss将会降至7.0左右，耗时约1.5h，请合理安排训练时间。
 test3: 用test2训练的模型测试效果，如果spearman相关系数高于0.3且pearson相关系数高于0.4，则通过测试。
