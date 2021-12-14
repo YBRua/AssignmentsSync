@@ -82,13 +82,16 @@ class TankingLoader(DropoutLoader):
             shuffle=shuffle,
             proportion=proportion,
             drops=drops)
+        self.dropped_train = [
+            (x, y) for (x, y) in self.dropped_train if y in self.drops]
 
     def _sample_training_set(self):
         resampled = [
             (x, y) for (x, y) in self.train
             if y not in self.drops and random.random() >= self.proportion]
 
-        return resampled + self.dropped_train
+        train = resampled + self.dropped_train
+        return train
 
     def __call__(self):
         resampled_train = ThinkSet(self._sample_training_set())

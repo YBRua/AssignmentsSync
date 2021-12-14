@@ -9,20 +9,23 @@ from tqdm import tqdm
 
 from model import LeNet
 
-SEED = 1919810
-EPOCHES = 20
-BATCH_SIZE = 128
+SEED = 10374
+EPOCHES = 15
+BATCH_SIZE = 64
 
 model = LeNet()
 optimizer = optim.Adam(parameters=model.parameters())
 
-paddle.seed(1919810)
-random.seed(1919810)
+paddle.seed(SEED)
+random.seed(SEED)
 
-loader: ldrs.BaseLoaderHelper = ldrs.DropoutLoader()
+loader_2 = ldrs.TankingLoader(batch_size=BATCH_SIZE)
+loader_1 = ldrs.DropoutLoader(batch_size=BATCH_SIZE)
+loader_1.train_loader = loader_2.train_loader
 
 model.train()
 for e in range(EPOCHES):
+    loader = loader_1 if e < 5 else loader_2
     train_loader, test_loader = loader()
     batch_counter = 0
     tot_acc = 0
