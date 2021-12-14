@@ -19,11 +19,11 @@ optimizer = optim.Adam(parameters=model.parameters())
 paddle.seed(1919810)
 random.seed(1919810)
 
-train_loader, test_loader = ldrs.dropall_loader()
-
+loader: ldrs.BaseLoaderHelper = ldrs.DropoutLoader()
 
 model.train()
 for e in range(EPOCHES):
+    train_loader, test_loader = loader()
     batch_counter = 0
     tot_acc = 0
     tot_loss = 0

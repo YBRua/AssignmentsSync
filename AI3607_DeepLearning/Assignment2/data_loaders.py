@@ -13,6 +13,7 @@ class BaseLoaderHelper():
     def __init__(self, batch_size=128, shuffle=True):
         self.batch_size = batch_size
         self.shuffle = shuffle
+        self.train, self.test = self._get_paddle_mnist()
 
     def _get_paddle_mnist(self):
         transform = trans.Compose([
@@ -23,13 +24,11 @@ class BaseLoaderHelper():
 
         return train_dataset, test_dataset
 
-    def _wrap_dataloaders(self, train, test):
-        train_loader = DataLoader(
-            train, batch_size=self.batch_size, shuffle=self.shuffle)
-        test_loader = DataLoader(
-            test, batch_size=self.batch_size, shuffle=self.shuffle)
+    def _wrap_dataloaders(self, dataset):
+        loader = DataLoader(
+            dataset, batch_size=self.batch_size, shuffle=self.shuffle)
 
-        return train_loader, test_loader
+        return loader
 
     def __call__(self):
         return None, None
@@ -38,10 +37,12 @@ class BaseLoaderHelper():
 class VanillaLoader(BaseLoaderHelper):
     def __init__(self, batch_size=128, shuffle=True):
         super().__init__(batch_size=batch_size, shuffle=shuffle)
+        self.train_loader = self._wrap_dataloaders(self.train)
+        self.test_loader = self._wrap_dataloaders(self.test)
+            
 
     def __call__(self):
-        train, test = self._get_paddle_mnist()
-        return self._wrap_dataloaders(train, test)
+        return self.train_loader, self.test_loader
 
 
 class DropoutLoader(BaseLoaderHelper):
@@ -50,31 +51,58 @@ class DropoutLoader(BaseLoaderHelper):
             batch_size=128,
             shuffle=True,
             proportion=0.9,
-            drops=set(range(5))):
+            drops=list(range(5))):
         super().__init__(batch_size=batch_size, shuffle=shuffle)
         self.proportion = proportion
         self.drops = drops
+        self.dropped_train = self._data_dropout(self.train)
+        self.train_loader = self._wrap_dataloaders(
+            ThinkSet(self.dropped_train))
+        self.test_loader = self._wrap_dataloaders(self.test)
 
     def _data_dropout(self, dataset):
         dropped = [
             (x, y) for (x, y) in dataset
             if y not in self.drops or random.random() >= self.proportion]
 
-        return ThinkSet(dropped)
+        return dropped
 
     def __call__(self):
-        train, test = self._get_paddle_mnist()
-        train = self._data_dropout(train)
-        return self._wrap_dataloaders(train, test)
+        return self.train_loader, self.test_loader
 
 
-class RandomLabeledLoader(DropoutLoader):
+class TankingLoader(DropoutLoader):
     def __init__(
             self,
             batch_size=128,
             shuffle=True,
             proportion=0.9,
-            drops=set(range(5))):
+            drops=list(range(5))):
+        super().__init__(
+            batch_size=batch_size,
+            shuffle=shuffle,
+            proportion=proportion,
+            drops=drops)
+
+    def _sample_training_set(self):
+        resampled = [
+            (x, y) for (x, y) in self.train
+            if y not in self.drops and random.random() >= self.proportion]
+
+        return resampled + self.dropped_train
+
+    def __call__(self):
+        resampled_train = ThinkSet(self._sample_training_set())
+        return self._wrap_dataloaders(resampled_train), self.test_loader
+
+
+class RandomLabelLoader(DropoutLoader):
+    def __init__(
+            self,
+            batch_size=128,
+            shuffle=True,
+            proportion=0.9,
+            drops=list(range(5))):
         super().__init__(
             batch_size=batch_size,
             shuffle=shuffle,
@@ -86,8 +114,4 @@ class RandomLabeledLoader(DropoutLoader):
         return ThinkSet(dataset)
 
     def __call__(self):
-        train, test = self._get_paddle_mnist()
-        train = self._data_dropout(train)
-        train = self._shuffle_labels(train)
-
-        return self._wrap_dataloaders(train, test)
+        pass
