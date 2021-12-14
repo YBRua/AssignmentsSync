@@ -39,7 +39,6 @@ class VanillaLoader(BaseLoaderHelper):
         super().__init__(batch_size=batch_size, shuffle=shuffle)
         self.train_loader = self._wrap_dataloaders(self.train)
         self.test_loader = self._wrap_dataloaders(self.test)
-            
 
     def __call__(self):
         return self.train_loader, self.test_loader
@@ -94,24 +93,3 @@ class TankingLoader(DropoutLoader):
     def __call__(self):
         resampled_train = ThinkSet(self._sample_training_set())
         return self._wrap_dataloaders(resampled_train), self.test_loader
-
-
-class RandomLabelLoader(DropoutLoader):
-    def __init__(
-            self,
-            batch_size=128,
-            shuffle=True,
-            proportion=0.9,
-            drops=list(range(5))):
-        super().__init__(
-            batch_size=batch_size,
-            shuffle=shuffle,
-            proportion=proportion,
-            drops=drops)
-
-    def _shuffle_labels(self, dataset):
-        dataset = [(x, random.randint(0, 9)) for (x, _) in dataset]
-        return ThinkSet(dataset)
-
-    def __call__(self):
-        pass
