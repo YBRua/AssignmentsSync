@@ -16,7 +16,6 @@ class BaseLoaderHelper():
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.train, self.test = self._get_paddle_mnist()
-        raise TypeError('This cls should not be instantiated!')
 
     def _get_paddle_mnist(self):
         transform = trans.Compose([

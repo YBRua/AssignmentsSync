@@ -109,7 +109,7 @@ def main():
     tst_accs = []
     for e in range(EPOCHES):
         if MODE == 'tanking':
-            loader = loader_2 if e < 7 else loader_2
+            loader = loader_1 if e < 7 else loader_2
         loss, trn_acc, tst_acc = train_one_epoch(e, model, optimizer, loader)
         losses.append(loss)
         trn_accs.append(trn_acc)
