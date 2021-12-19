@@ -11,9 +11,12 @@ class ThinkSet(list, Dataset):
 
 class BaseLoaderHelper():
     def __init__(self, batch_size=128, shuffle=True):
+        """The base for all data loaders. Should not be instantiated or used.
+        """
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.train, self.test = self._get_paddle_mnist()
+        raise TypeError('This cls should not be instantiated!')
 
     def _get_paddle_mnist(self):
         transform = trans.Compose([
@@ -36,6 +39,12 @@ class BaseLoaderHelper():
 
 class VanillaLoader(BaseLoaderHelper):
     def __init__(self, batch_size=128, shuffle=True):
+        """Standard dataloader that loads the entire MNIST when called
+
+        Args:
+            batch_size (int): Defaults to 128.
+            shuffle (bool): Defaults to True.
+        """
         super().__init__(batch_size=batch_size, shuffle=shuffle)
         self.train_loader = self._wrap_dataloaders(self.train)
         self.test_loader = self._wrap_dataloaders(self.test)
@@ -51,6 +60,18 @@ class DropoutLoader(BaseLoaderHelper):
             shuffle=True,
             proportion=0.9,
             drops=list(range(5))):
+        """Dropout loader that randomly drops `proportion` samples
+        of given labels from the original dataset.
+
+        Will drop samples with labels indicated by `drops`
+
+        Args:
+            batch_size (int): Defaults to 128.
+            shuffle (bool): Defaults to True.
+            proportion (float): Proportion of samples to drop. Defaults to 0.9.
+            drops (List): A list of ints, indicates the classes to drop.
+                Defaults to [0, 1, 2, 3, 4].
+        """
         super().__init__(batch_size=batch_size, shuffle=shuffle)
         self.proportion = proportion
         self.drops = drops
@@ -77,6 +98,20 @@ class TankingLoader(DropoutLoader):
             shuffle=True,
             proportion=0.9,
             drops=list(range(5))):
+        """Randomly drops `proportion` samples of given labels
+        from the original dataset.
+        Also samples (1 - `proportion`) samples
+        from classes that are not in `drops` to mitigate imbalance
+
+        Will drop samples with labels indicated by `drops`
+
+        Args:
+            batch_size (int): Defaults to 128.
+            shuffle (bool): Defaults to True.
+            proportion (float): Proportion of samples to drop. Defaults to 0.9.
+            drops (List): A list of ints, indicates the classes to drop.
+                Defaults to [0, 1, 2, 3, 4].
+        """
         super().__init__(
             batch_size=batch_size,
             shuffle=shuffle,
