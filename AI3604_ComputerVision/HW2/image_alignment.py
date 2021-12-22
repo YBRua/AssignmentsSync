@@ -285,6 +285,12 @@ def draw_matches(image1, image2, corners1, corners2, matches,
     - match_image (3D uint8 array): A color image having shape
         (max(H1, H2), W1 + W2, 3).
     """
+    if matches is None:
+        H = max(image1.shape[0], image2.shape[0])
+        image1 = np.pad(image1, [(0, max(0, H-image1.shape[0])), (0, 0), (0, 0)])
+        image2 = np.pad(image2, [(0, max(0, H-image2.shape[0])), (0, 0), (0, 0)])
+        offset = image1.shape[1]
+        match_image = np.concatenate((image1, image2), axis=1)
     if outlier_labels is None:
         colors = [(255, 0, 0)] * len(matches)
     else:
@@ -403,6 +409,8 @@ def stitch_images(image1, image2, xform):
     """
     image1 = np.pad(image1, [(200, 200), (200, 200), (0, 0)])
     image2 = np.pad(image2, [(200, 200), (200, 200), (0, 0)])
+    if xform is None:
+        return image1.astype(np.uint8)
     image_warped: np.ndarray = cv2.warpAffine(
         image1,
         xform[:2],
@@ -414,7 +422,7 @@ def stitch_images(image1, image2, xform):
 
 
 def main():
-    img_name = 'leuven'
+    img_name = 'wall'
     img_id1 = 1
     img_id2 = 3
     img_path1 = f'data/{img_name}{img_id1}.png'
@@ -451,7 +459,6 @@ def main():
 
     if xform is None:
         print('Matching failed. Exiting.')
-        return
 
     stitched = stitch_images(img1, img2, xform)
     cv2.imwrite(
