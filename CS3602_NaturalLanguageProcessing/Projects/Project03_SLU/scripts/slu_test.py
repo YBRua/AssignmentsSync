@@ -1,42 +1,21 @@
-#coding=utf8
-import sys, os, time, gc
+# coding=utf8
+import os
+import gc
+import sys
+import time
+import torch
+import numpy as np
 from torch.optim import Adam
 
 install_path = os.path.abspath(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(install_path)
 
 from utils.args import init_args
-from utils.initialization import *
+import utils.initialization as init
 from utils.example import Example
 from utils.batch import from_example_list
 from utils.vocab import PAD
-from model.slu_baseline_tagging import SLUTagging
-
-# initialization params, output path, logger, random seed and torch.device
-args = init_args(sys.argv[1:])
-set_random_seed(args.seed)
-device = set_torch_device(args.device)
-print("Initialization finished ...")
-print("Random seed is set to %d" % (args.seed))
-print("Use GPU with index %s" % (args.device) if args.device >= 0 else "Use CPU as target torch device")
-
-start_time = time.time()
-train_path = os.path.join(args.dataroot, 'train.json')
-dev_path = os.path.join(args.dataroot, 'development.json')
-Example.configuration(args.dataroot, train_path=train_path, word2vec_path=args.word2vec_path)
-train_dataset = Example.load_dataset(train_path)
-dev_dataset = Example.load_dataset(dev_path)
-print("Load dataset and database finished, cost %.4fs ..." % (time.time() - start_time))
-print("Dataset size: train -> %d ; dev -> %d" % (len(train_dataset), len(dev_dataset)))
-
-args.vocab_size = Example.word_vocab.vocab_size
-args.pad_idx = Example.word_vocab[PAD]
-args.num_tags = Example.label_vocab.num_tags
-args.tag_pad_idx = Example.label_vocab.convert_tag_to_idx(PAD)
-
-
-model = SLUTagging(args).to(device)
-Example.word2vec.load_embeddings(model.word_embed, Example.word_vocab, device=device)
+from model.slu_pinyin_tagging import PinyinSLUTagging
 
 
 def set_optimizer(model, args):
@@ -67,6 +46,48 @@ def decode(choice):
     return metrics, total_loss / count
 
 
+# initialization params, output path, logger, random seed and torch.device
+args = init_args(sys.argv[1:])
+init.set_random_seed(args.seed)
+device = init.set_torch_device(args.device)
+print("Initialization finished ...")
+print("Random seed is set to %d" % (args.seed))
+print(
+    "Use GPU with index %s" % (args.device)
+    if args.device >= 0 else "Use CPU as target torch device")
+
+start_time = time.time()
+train_path = os.path.join(args.dataroot, 'train.json')
+dev_path = os.path.join(args.dataroot, 'development.json')
+Example.configuration(
+    args.dataroot,
+    train_path=train_path,
+    word2vec_path=args.word2vec_path,
+    with_pinyin=True)
+train_dataset = Example.load_dataset(train_path)
+dev_dataset = Example.load_dataset(dev_path)
+print("Load dataset and database finished, cost %.4fs ..." % (time.time() - start_time))
+print("Dataset size: train -> %d ; dev -> %d" % (len(train_dataset), len(dev_dataset)))
+
+args.vocab_size = Example.word_vocab.vocab_size
+args.pinyin_size = Example.pinyin_vocab.vocab_size
+args.pad_idx = Example.word_vocab[PAD]
+args.num_tags = Example.label_vocab.num_tags
+args.tag_pad_idx = Example.label_vocab.convert_tag_to_idx(PAD)
+
+model = PinyinSLUTagging(args).to(device)
+Example.word2vec.load_embeddings(
+    model.word_embed,
+    Example.word_vocab,
+    device=device)
+Example.pinyin2vec.load_embeddings(
+    model.pinyin_embed,
+    Example.pinyin_vocab,
+    device=device
+)
+
+# print(Example.pinyin_vocab.word2id)
+
 if not args.testing:
     num_training_steps = ((len(train_dataset) + args.batch_size - 1) // args.batch_size) * args.max_epoch
     print('Total training steps: %d' % (num_training_steps))
@@ -81,8 +102,14 @@ if not args.testing:
         model.train()
         count = 0
         for j in range(0, nsamples, step_size):
-            cur_dataset = [train_dataset[k] for k in train_index[j: j + step_size]]
-            current_batch = from_example_list(args, cur_dataset, device, train=True)
+            cur_dataset = [
+                train_dataset[k] for k in train_index[j: j + step_size]
+            ]
+            current_batch = from_example_list(
+                args,
+                cur_dataset,
+                device,
+                train=True)
             output, loss = model(current_batch)
             epoch_loss += loss.item()
             loss.backward()

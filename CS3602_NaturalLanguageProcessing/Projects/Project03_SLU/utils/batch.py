@@ -1,8 +1,16 @@
 #-*- coding:utf-8 -*-
 import torch
 
+from utils.example import Example
+from argparse import Namespace
+from typing import List
 
-def from_example_list(args, ex_list, device='cpu', train=True):
+
+def from_example_list(
+        args: Namespace,
+        ex_list: List[Example],
+        device='cpu',
+        train=True):
     ex_list = sorted(ex_list, key=lambda x: len(x.input_idx), reverse=True)
     batch = Batch(ex_list, device)
     pad_idx = args.pad_idx
@@ -12,6 +20,12 @@ def from_example_list(args, ex_list, device='cpu', train=True):
     input_lens = [len(ex.input_idx) for ex in ex_list]
     max_len = max(input_lens)
     input_ids = [ex.input_idx + [pad_idx] * (max_len - len(ex.input_idx)) for ex in ex_list]
+    # for debuggin purposes
+    # for ex in ex_list:
+    #     assert len(ex.pinyin_idx) == len(ex.input_idx)
+    if ex_list[0].pinyin_idx is not None:
+        pinyin_ids = [ex.pinyin_idx + [pad_idx] * (max_len - len(ex.pinyin_idx)) for ex in ex_list]
+        batch.pinyin_ids = torch.tensor(pinyin_ids, dtype=torch.long, device=device)
     batch.input_ids = torch.tensor(input_ids, dtype=torch.long, device=device)
     batch.lengths = input_lens
 
