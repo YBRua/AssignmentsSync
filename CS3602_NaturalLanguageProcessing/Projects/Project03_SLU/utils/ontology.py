@@ -17,19 +17,9 @@ class Ontology():
         self.pinyin = pinyin
         self.ontology: Dict[str, List[str]] = {}
         self.char2sems: Dict[str, Dict[str, set]] = {}
-        # self.pinyinchar2sems: Dict[str, Dict[str, set]] = {}
-        if self.pinyin:
-            self.pinyin2sems: Dict[str, Dict[str, str]] = {}
-            # self.sems2pinyin: Dict[str, Dict[str, str]] = {}
-        else:
-            self.pinyin2sems = None
-            # self.sems2pinyin = None
 
         for slot, values in ontology_json['slots'].items():
             char2sem = defaultdict(set)
-            # pinyinchar2sem = defaultdict(set)
-            pinyin2sem = {}
-            sem2pinyin = {}
 
             # load text file if value is a relative path
             if isinstance(values, str):
@@ -39,23 +29,9 @@ class Ontology():
             # convert list to sets
             self.ontology[slot] = set(values)
 
-            # pinyinization
-            if self.pinyin:
-                for semantic in self.ontology[slot]:
-                    pinyin = self._pinyinization(semantic)
-                    pinyin2sem[pinyin] = semantic
-                    sem2pinyin[semantic] = pinyin
-                self.pinyin2sems[slot] = pinyin2sem
-                # self.sems2pinyin[slot] = sem2pinyin
-
             # construct character-to-sentence map to speed up searching
             for semantic in self.ontology[slot]:
                 for char in semantic:
-                    if self.pinyin:
-                        pinyin = pypinyin.lazy_pinyin(char)
-                        assert len(pinyin) == 1, f"Huh? {len(pinyin)}"
-                        pinyin = pinyin[0]
-                        # pinyinchar2sem[pinyin].add(semantic)
                     char2sem[char].add(semantic)
             self.char2sems[slot] = char2sem
             # self.pinyinchar2sems[slot] = pinyinchar2sem
@@ -80,8 +56,8 @@ class Ontology():
     #     candidates = set([self.sems2pinyin[slot][cand] for cand in candidates])
 
     #     # shortcut
-    #     if value in candidates:
-    #         return self.pinyin2sems[slot][value], 0
+        # if value in candidates:
+        #     return self.pinyin2sems[slot][value], 0
 
     #     # search for closest value in ontology
     #     for candidate in candidates:
