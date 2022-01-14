@@ -18,7 +18,7 @@ class OntologyGuidedTagging(nn.Module):
         self.dropout_layer = nn.Dropout(p=config.dropout)
         self.output_layer = TaggingFNNDecoder(config.hidden_size, config.num_tags, config.tag_pad_idx)
         self.ontology = ontology
-        self.thres = 0.4
+        self.thres = 0.35
 
     def forward(self, batch):
         tag_ids = batch.tag_ids
@@ -37,7 +37,7 @@ class OntologyGuidedTagging(nn.Module):
 
     def get_candidate_semantics(self, slot, value):
         semantic, distance = self.ontology.get_closest_semantic(slot, value, self.thres)
-        if distance > self.thres:
+        if distance > self.thres + 0.1:
             semantic = UNK
         return semantic
 
@@ -74,7 +74,10 @@ class OntologyGuidedTagging(nn.Module):
                 if value != UNK:
                     pred_tuple.append(f'{slot}-{value}')
             predictions.append(pred_tuple)
-        return predictions, labels, loss.cpu().item()
+        if loss is not None:
+            return predictions, labels, loss.cpu().item()
+        else:
+            return predictions, labels, None
 
 
 class TaggingFNNDecoder(nn.Module):
@@ -87,9 +90,10 @@ class TaggingFNNDecoder(nn.Module):
 
     def forward(self, hiddens, mask, labels=None):
         logits = self.output_layer(hiddens)
-        logits += (1 - mask).unsqueeze(-1).repeat(1, 1, self.num_tags) * -1e32
+        if mask is not None:
+            logits += (1 - mask).unsqueeze(-1).repeat(1, 1, self.num_tags) * -1e32
         prob = torch.softmax(logits, dim=-1)
         if labels is not None:
             loss = self.loss_fct(logits.view(-1, logits.shape[-1]), labels.view(-1))
             return prob, loss
-        return prob
+        return prob, None

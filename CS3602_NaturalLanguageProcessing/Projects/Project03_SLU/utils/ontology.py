@@ -61,7 +61,7 @@ class Ontology():
             self.pinyinchar2sems[slot] = pinyinchar2sem
 
     def _pinyinization(self, s: str):
-        return '-'.join(pypinyin.lazy_pinyin(s))
+        return ''.join(pypinyin.lazy_pinyin(s, style=pypinyin.Style.BOPOMOFO))
 
     def _load_data_from_path(self, path):
         with open(path, 'r', encoding='utf-8') as f:
