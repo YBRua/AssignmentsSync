@@ -46,7 +46,8 @@ class Example():
         self.ex = ex
 
         self.utt = ex['asr_1best']
-        self.pinyin = pypinyin.pinyin(self.utt, style=pypinyin.NORMAL)
+        if Example.pinyin_vocab is not None:
+            self.pinyin = pypinyin.pinyin(self.utt, style=pypinyin.NORMAL)
         self.slot = {}
         for label in ex['semantic']:
             act_slot = f'{label[0]}-{label[1]}'
