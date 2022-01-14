@@ -61,7 +61,7 @@ if __name__ == '__main__':
 
     train_path = os.path.join(args.dataroot, 'train.json')
     dev_path = os.path.join(args.dataroot, 'development.json')
-    test_path = os.path.join(args.dataroot, 'development.json')
+    test_path = os.path.join(args.dataroot, 'test_unlabelled.json')
     output_path = os.path.join(args.dataroot, 'test.json')
     ontology_path = os.path.join(args.dataroot, 'ontology.json')
     model_path = args.model_save

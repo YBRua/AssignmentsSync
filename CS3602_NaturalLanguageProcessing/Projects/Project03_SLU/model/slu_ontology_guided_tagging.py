@@ -18,7 +18,7 @@ class OntologyGuidedTagging(nn.Module):
         self.dropout_layer = nn.Dropout(p=config.dropout)
         self.output_layer = TaggingFNNDecoder(config.hidden_size, config.num_tags, config.tag_pad_idx)
         self.ontology = ontology
-        self.thres = 0.35
+        self.thres = 0.475
 
     def forward(self, batch):
         tag_ids = batch.tag_ids
@@ -37,7 +37,7 @@ class OntologyGuidedTagging(nn.Module):
 
     def get_candidate_semantics(self, slot, value):
         semantic, distance = self.ontology.get_closest_semantic(slot, value, self.thres)
-        if distance > self.thres + 0.1:
+        if distance > self.thres:
             semantic = UNK
         return semantic
 
