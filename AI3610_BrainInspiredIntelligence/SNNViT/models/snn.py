@@ -18,7 +18,6 @@ class SNNFeedFwdLayer(nn.Module):
         self.fc2 = nn.Linear(hidden_dims, input_dims)
         self.lif = snn.Leaky(beta=beta, spike_grad=spike_grad)
 
-
     def init_leaky(self):
         return self.lif.init_leaky()
 

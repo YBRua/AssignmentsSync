@@ -20,7 +20,8 @@ def train(
         loss: nn.Module,
         optimizer: optim.Optimizer,
         train_loader: DataLoader,
-        device: torch.device):
+        device: torch.device,
+        args):
 
     model.train()
 
@@ -31,13 +32,13 @@ def train(
         bid += 1
         x = x.to(device)
 
-        if IS_SNN:
-            x = spikegen.rate(x, STEPS)
+        if args.is_snn:
+            x = spikegen.rate(x, args.steps)
 
         y = y.to(device)
 
         optimizer.zero_grad()
-        if IS_SNN:
+        if args.is_snn:
             out, _ = model(x)
         else:
             out = model(x)
@@ -45,7 +46,7 @@ def train(
         loss_value.backward()
         optimizer.step()
 
-        if IS_SNN:
+        if args.is_snn:
             acc = SF.accuracy_rate(out, y)
         else:
             pred = out.argmax(dim=1)
@@ -57,14 +58,16 @@ def train(
         avg_acc = tot_acc / bid
         avg_loss = tot_loss / bid
 
-        prog.set_description(f'| Epoch {epoch} | Loss {avg_loss:.4f} | Acc {avg_acc:.4f} |')
+        prog.set_description(
+            f'| Epoch {epoch} | Loss {avg_loss:.4f} | Acc {avg_acc:.4f} |')
 
 
 def evaluate(
         epoch: int,
         model: nn.Module,
         test_loader: DataLoader,
-        device: torch.device):
+        device: torch.device,
+        args):
     print(f'| Epoch {epoch} | Running Evaluation |')
     model.eval()
 
@@ -75,15 +78,15 @@ def evaluate(
             x = x.to(device)
             y = y.to(device)
 
-            if IS_SNN:
-                x = spikegen.rate(x, STEPS)
+            if args.is_snn:
+                x = spikegen.rate(x, args.steps)
 
-            if IS_SNN:
+            if args.is_snn:
                 out, _ = model(x)
             else:
                 out = model(x)
 
-            if IS_SNN:
+            if args.is_snn:
                 acc = SF.accuracy_rate(out, y) * y.shape[0]
             else:
                 pred = out.argmax(dim=1)
@@ -108,15 +111,27 @@ if __name__ == '__main__':
     STEPS = args.steps
     DEVICE = torch.device(args.device)
 
+    torch.manual_seed(args.seed)
+
     spike_grad = surrogate.fast_sigmoid()
 
     # ViT Architecture parameters
-    IMG_SIZE = 28
-    N_CHANNELS = 1
-    PATCH_SIZE = 4
-    EMBEDDING_DIM = 64
-    N_CLASSES = 10
-    N_HEADS = 4
+    if args.dataset == 'mnist':
+        # MNIST
+        IMG_SIZE = 28
+        N_CHANNELS = 1
+        PATCH_SIZE = 4
+        EMBEDDING_DIM = 64
+        N_CLASSES = 10
+        N_HEADS = 4
+    else:
+        # CIFAR10
+        IMG_SIZE = 32
+        N_CHANNELS = 3
+        PATCH_SIZE = 4
+        EMBEDDING_DIM = 64
+        N_CLASSES = 10
+        N_HEADS = 4
 
     if IS_SNN:
         print('Initializing SNN ViT')
@@ -133,20 +148,25 @@ if __name__ == '__main__':
     else:
         print('Initializing ANN ViT')
         model = ViT(
-            img_size=28,
-            n_channels=1,
-            patch_size=4,
-            embedding_dim=64,
-            n_classes=10,
-            nhead=4,)
+            img_size=IMG_SIZE,
+            n_channels=N_CHANNELS,
+            patch_size=PATCH_SIZE,
+            embedding_dim=EMBEDDING_DIM,
+            n_classes=N_CLASSES,
+            nhead=N_HEADS)
     model.to(DEVICE)
 
     loss = SF.ce_count_loss() if IS_SNN else nn.CrossEntropyLoss()
 
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    train_set, test_set = data_prep.load_mnist(DATASET_PATH)
-    train_loader, test_loader = data_prep.wrap_dataloaders(train_set, test_set, batch_size=BATCH_SIZE)
+
+    if args.dataset == 'mnist':
+        train_set, test_set = data_prep.load_mnist(DATASET_PATH)
+    else:
+        train_set, test_set = data_prep.load_cifar(DATASET_PATH)
+    train_loader, test_loader = data_prep.wrap_dataloaders(
+        train_set, test_set, batch_size=BATCH_SIZE)
 
     for e in range(EPOCHS):
-        train(e, model, loss, optimizer, train_loader, DEVICE)
-        evaluate(e, model, test_loader, DEVICE)
+        train(e, model, loss, optimizer, train_loader, DEVICE, args)
+        evaluate(e, model, test_loader, DEVICE, args)

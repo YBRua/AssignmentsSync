@@ -52,7 +52,14 @@ class PredictionHead(nn.Module):
 
 
 class ViT(nn.Module):
-    def __init__(self, img_size, n_channels, patch_size, embedding_dim, n_classes, nhead):
+    def __init__(
+            self,
+            img_size: int,
+            n_channels: int,
+            patch_size: int,
+            embedding_dim: int,
+            n_classes: int,
+            nhead: int):
         super().__init__()
         self.embedding = EmbeddingLayer(img_size, n_channels, embedding_dim, patch_size)
         self.encoder = Encoder(embedding_dim, embedding_dim, nhead)
