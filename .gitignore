@@ -10,6 +10,7 @@ __pycache__
 CS3602_NaturalLanguageProcessing/Projects/Project02_CBOW/data/
 CS3602_NaturalLanguageProcessing/Projects/Project02_CBOW/ckpt/
 **/data/**
+word2vec-768.txt
 
 # .pt file for whatever model
 *.pt
