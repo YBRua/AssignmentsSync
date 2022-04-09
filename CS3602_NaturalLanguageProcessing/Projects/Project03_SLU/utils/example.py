@@ -32,20 +32,25 @@ class Example():
             cls.pinyin2vec = None
 
     @classmethod
-    def load_dataset(cls, data_path):
+    def load_dataset(cls, data_path, use_transcript=False):
+        if use_transcript:
+            print('Using manual transcripts for', data_path)
         datas = json.load(open(data_path, 'r', encoding='utf-8'))
         examples: List[Example] = []
         for data in datas:
             for utt in data:
                 example = cls(utt)
                 examples.append(example)
+                if use_transcript:
+                    example = cls(utt, 'manual_transcript')
+                    examples.append(example)
         return examples
 
-    def __init__(self, ex: dict):
+    def __init__(self, ex: dict, utt_key='asr_1best'):
         super(Example, self).__init__()
         self.ex = ex
 
-        self.utt = ex['asr_1best']
+        self.utt = ex[utt_key]
         if Example.pinyin_vocab is not None:
             self.pinyin = pypinyin.pinyin(self.utt, style=pypinyin.NORMAL)
         self.slot = {}

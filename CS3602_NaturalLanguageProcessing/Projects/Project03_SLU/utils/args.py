@@ -23,6 +23,7 @@ def add_argument_base(arg_parser: argparse.ArgumentParser):
     arg_parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
     arg_parser.add_argument('--max_epoch', type=int, default=25, help='terminate after maximum epochs')
     arg_parser.add_argument('--pinyin', action='store_true', help='whether to enable pinyin fallback')
+    arg_parser.add_argument('--transcript', action='store_true', help='whether to use manuscript for training')
     #### Common Encoder Hyperparams ####
     arg_parser.add_argument('--encoder_cell', default='LSTM', choices=['LSTM', 'GRU', 'RNN'], help='root of data')
     arg_parser.add_argument('--dropout', type=float, default=0.2, help='feature dropout rate')
