@@ -9,6 +9,7 @@ __pycache__
 # Dataset for NLP
 CS3602_NaturalLanguageProcessing/Projects/Project02_CBOW/data/
 CS3602_NaturalLanguageProcessing/Projects/Project02_CBOW/ckpt/
+**/data/**
 
 # .pt file for whatever model
 *.pt
